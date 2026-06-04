@@ -220,30 +220,37 @@ function SpringSimulationScene({
 
 // Helper to draw animated spring line on frame
 function SpringLine({ nodesRef, symbolA, symbolB }) {
-  const lineRef = useRef();
+  const geomRef = useRef();
 
   useFrame(() => {
-    if (lineRef.current) {
+    if (geomRef.current) {
       const nodeA = nodesRef.current[symbolA];
       const nodeB = nodesRef.current[symbolB];
       if (nodeA && nodeB) {
-        lineRef.current.setPoints([
-          [nodeA.pos.x, nodeA.pos.y, nodeA.pos.z],
-          [nodeB.pos.x, nodeB.pos.y, nodeB.pos.z]
-        ]);
+        const positions = geomRef.current.attributes.position.array;
+        positions[0] = nodeA.pos.x;
+        positions[1] = nodeA.pos.y;
+        positions[2] = nodeA.pos.z;
+        positions[3] = nodeB.pos.x;
+        positions[4] = nodeB.pos.y;
+        positions[5] = nodeB.pos.z;
+        geomRef.current.attributes.position.needsUpdate = true;
       }
     }
   });
 
+  const initialPositions = React.useMemo(() => new Float32Array(6), []);
+
   return (
-    <Line
-      ref={lineRef}
-      points={[[0,0,0], [0,0,0]]}
-      color="#475569"
-      lineWidth={1.5}
-      transparent
-      opacity={0.5}
-    />
+    <line>
+      <bufferGeometry ref={geomRef}>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[initialPositions, 3]}
+        />
+      </bufferGeometry>
+      <lineBasicMaterial color="#475569" linewidth={1} transparent opacity={0.5} />
+    </line>
   );
 }
 
