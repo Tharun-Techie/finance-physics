@@ -6,17 +6,21 @@ import { SECTORS } from '../data/mockData';
 import { evaluateFormula } from '../utils/formulaParser';
 
 // Component to handle dynamic coordinate updates and camera defaults
-function SceneSetup() {
+function SceneSetup({ fov }) {
   const { camera } = useThree();
+  
   useEffect(() => {
-    camera.position.set(12, 10, 16);
-    camera.lookAt(0, 0, 0);
-  }, [camera]);
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }, [fov, camera]);
+
   return null;
 }
 
 // Axis lines and grid labels
-function CoordinateAxes({ xName, yName, zName, ranges }) {
+function CoordinateAxes({ xName, yName, zName, ranges, visible }) {
+  if (!visible) return null;
+
   return (
     <group>
       {/* Grids */}
@@ -146,7 +150,7 @@ function CoordinateAxes({ xName, yName, zName, ranges }) {
   );
 }
 
-// Single asset point component
+// Single asset point component with Blender shading configuration
 function AssetSphere({
   asset,
   pos,
@@ -158,7 +162,9 @@ function AssetSphere({
   onHover,
   showVectorLines,
   velocityVec,
-  forceVec
+  forceVec,
+  shadingMode,
+  materials
 }) {
   const meshRef = useRef();
   const [hovered, setHovered] = useState(false);
@@ -188,6 +194,15 @@ function AssetSphere({
     document.body.style.cursor = 'default';
   };
 
+  // Adjust material specs based on Blender Viewport shading mode
+  const isWireframe = shadingMode === 'wireframe';
+  const isSolid = shadingMode === 'solid';
+
+  const finalRoughness = isSolid ? 0.9 : materials.roughness;
+  const finalMetalness = isSolid ? 0.1 : materials.metalness;
+  const finalEmissive = isSolid ? '#000000' : color;
+  const finalEmissiveIntensity = isSolid ? 0.0 : (hovered || isSelected ? materials.emissiveIntensity * 1.5 : materials.emissiveIntensity);
+
   return (
     <group position={pos}>
       {/* Selected Indicator Ring */}
@@ -199,7 +214,7 @@ function AssetSphere({
       )}
 
       {/* Outer Glow Halo */}
-      {(hovered || isSelected) && (
+      {shadingMode === 'rendered' && (hovered || isSelected) && (
         <mesh>
           <sphereGeometry args={[size * 1.3, 16, 16]} />
           <meshBasicMaterial 
@@ -224,12 +239,13 @@ function AssetSphere({
         <sphereGeometry args={[1, 32, 32]} />
         <meshStandardMaterial
           color={color}
-          roughness={0.15}
-          metalness={0.85}
-          transparent
-          opacity={opacity}
-          emissive={color}
-          emissiveIntensity={hovered || isSelected ? 0.8 : 0.2}
+          roughness={finalRoughness}
+          metalness={finalMetalness}
+          transparent={opacity < 1 || materials.opacity < 1}
+          opacity={opacity * materials.opacity}
+          emissive={finalEmissive}
+          emissiveIntensity={finalEmissiveIntensity}
+          wireframe={isWireframe}
         />
       </mesh>
 
@@ -355,10 +371,9 @@ function CorrelationConnections({ assets, positions, selectedAssetSymbol }) {
   );
 }
 
-// Starfield Background
-function Starfield() {
+// Starfield Background with dynamic count settings
+function Starfield({ count }) {
   const pointsRef = useRef();
-  const count = 250;
   
   const positions = React.useMemo(() => {
     const pos = new Float32Array(count * 3);
@@ -368,7 +383,7 @@ function Starfield() {
       pos[i * 3 + 2] = (Math.random() - 0.5) * 55;
     }
     return pos;
-  }, []);
+  }, [count]);
 
   useFrame(() => {
     if (pointsRef.current) {
@@ -404,10 +419,10 @@ function SimulationSolver({
   mode,
   onUpdatePhysics,
   activePositions,
-  setActivePositions
+  setActivePositions,
+  gravityConstant = 1.0
 }) {
   const physicsStateRef = useRef({});
-  const lastTimeRef = useRef(0);
   const throttleCountRef = useRef(0);
 
   // Initialize/Reset physics positions based on mapped metric targets
@@ -436,12 +451,10 @@ function SimulationSolver({
   };
 
   useEffect(() => {
-    // Reset positions whenever dimension mappings change, or assets load, or reset trigger
+    // Reset positions whenever dimension mappings change, or assets load
     const initial = {};
     assets.forEach(asset => {
       const targetPos = getMappedCoordinates(asset);
-      
-      // If we already have a position, keep it, otherwise initialize at targets
       const existing = physicsStateRef.current[asset.symbol];
       initial[asset.symbol] = {
         pos: existing ? existing.pos.clone() : targetPos.clone(),
@@ -466,7 +479,6 @@ function SimulationSolver({
         if (!stateNode) return;
 
         const target = getMappedCoordinates(asset);
-        // Lerp position to target
         stateNode.pos.lerp(target, 0.1);
         stateNode.vel.set(0, 0, 0);
         stateNode.force.set(0, 0, 0);
@@ -495,7 +507,6 @@ function SimulationSolver({
       assets.forEach(asset => {
         forceAcc[asset.symbol] = new THREE.Vector3(0, 0, 0);
         
-        // Evaluate dynamic formula properties for each asset
         const vars = { ...asset.baseMetrics };
         physicsStats[asset.symbol] = {
           mass: Math.max(0.1, evaluateFormula(formulas.mass, vars)),
@@ -516,9 +527,6 @@ function SimulationSolver({
 
         const target = getMappedCoordinates(asset);
         const diff = new THREE.Vector3().subVectors(target, node.pos);
-        
-        // Spring-like restoring force towards equilibrium position
-        // Elasticity is inversely proportional to mass, or a default constant
         const eqForce = diff.clone().multiplyScalar(0.4); 
         forceAcc[asset.symbol].add(eqForce);
       });
@@ -536,29 +544,23 @@ function SimulationSolver({
 
           if (!nodeA || !nodeB || !statA || !statB) continue;
 
-          // Compute correlation (default to 0.5 if not found)
           const correlationVal = assetA.correlation !== undefined 
             ? assetA.correlation 
             : (assetA.sector === assetB.sector ? 0.8 : 0.35);
 
-          if (correlationVal <= 0) continue; // no gravitational pull for negative correlations
+          if (correlationVal <= 0) continue; 
 
           const diff = new THREE.Vector3().subVectors(nodeB.pos, nodeA.pos);
           const distSq = diff.lengthSq();
-          const dist = Math.sqrt(distSq);
 
-          if (dist < 1.0) continue; // limit force close by
+          if (distSq < 1.0) continue; 
 
-          // F_grav = G * (m1 * m2) / (r^2 + epsilon)
-          // gravity parameter evaluated from formula is statA.gravity / statB.gravity average
-          const G = (statA.gravity + statB.gravity) * 0.2 * correlationVal;
+          const G = (statA.gravity + statB.gravity) * 0.2 * correlationVal * gravityConstant;
           const forceMag = G * (statA.mass * statB.mass) / (distSq + 2.0);
           
           const gravityForce = diff.clone().normalize().multiplyScalar(forceMag);
           
-          // Pull A towards B
           forceAcc[assetA.symbol].add(gravityForce);
-          // Pull B towards A
           forceAcc[assetB.symbol].sub(gravityForce);
         }
       }
@@ -582,20 +584,18 @@ function SimulationSolver({
         const stats = physicsStats[asset.symbol];
         if (!stats || stats.force <= 0) return;
 
-        // Force pushes object in a random but momentum-aligned direction
         const node = activeState[asset.symbol];
         if (node) {
-          const push = new THREE.Vector3(0, stats.force * 0.05, 0); // upward force by default
+          const push = new THREE.Vector3(0, stats.force * 0.05, 0); 
           forceAcc[asset.symbol].add(push);
         }
       });
 
-      // Boundary restoration: prevent nodes from escaping grid dimensions
+      // Boundary restoration
       assets.forEach(asset => {
         const node = activeState[asset.symbol];
         if (!node) return;
         
-        // boundary repulsion
         if (Math.abs(node.pos.x) > 13) {
           forceAcc[asset.symbol].x += node.pos.x > 0 ? -2.0 : 2.0;
         }
@@ -607,7 +607,7 @@ function SimulationSolver({
         }
       });
 
-      // Apply acceleration, update velocities & positions
+      // Apply updates
       const nextPositions = {};
       const currentVelocities = {};
       const currentForces = {};
@@ -620,32 +620,23 @@ function SimulationSolver({
         const netForce = forceAcc[asset.symbol];
         node.force.copy(netForce);
 
-        // Acceleration = Force / Mass
         const acc = netForce.clone().divideScalar(stats.mass);
-
-        // Update velocity: V = V + A * dt
         node.vel.addScaledVector(acc, dt);
-
-        // Apply friction damping (from formulas)
-        // Friction reduces velocity: V = V * (1 - friction * dt)
         node.vel.multiplyScalar(Math.max(0, 1 - stats.friction * dt * 2.0));
 
-        // Speed limit to avoid physical explosions
         const speed = node.vel.length();
         if (speed > 8.0) {
           node.vel.normalize().multiplyScalar(8.0);
         }
 
-        // Update position: P = P + V * dt
         node.pos.addScaledVector(node.vel, dt);
 
-        // Save position outputs
         nextPositions[asset.symbol] = { x: node.pos.x, y: node.pos.y, z: node.pos.z };
         currentVelocities[asset.symbol] = { x: node.vel.x, y: node.vel.y, z: node.vel.z };
         currentForces[asset.symbol] = { x: node.force.x, y: node.force.y, z: node.force.z };
       });
 
-      // Update states
+      // Sync state back
       throttleCountRef.current++;
       if (throttleCountRef.current % 3 === 0) {
         setActivePositions(nextPositions);
@@ -672,11 +663,12 @@ export default function FinanceUniverseCanvas({
   setActivePositions,
   velocities,
   forces,
-  showVectorLines = true
+  showVectorLines = true,
+  sceneSettings,
+  materials
 }) {
   // Translate visual mappings (colors, size, opacity) based on the asset's active variables
   const assetVisuals = assets.map((asset) => {
-    // 1. Color mapping
     let color = 'hsl(200, 100%, 50%)';
     if (mappings.color === 'sector') {
       color = SECTORS[asset.sector]?.color || color;
@@ -686,22 +678,20 @@ export default function FinanceUniverseCanvas({
       const val = asset.baseMetrics[mappings.color] || 0;
       const range = ranges[mappings.color] || { min: 0, max: 100 };
       const ratio = (val - range.min) / ((range.max - range.min) || 1);
-      color = `hsl(${190 + ratio * 100}, 100%, 55%)`; // Cyan (low) to Pink (high)
+      color = `hsl(${190 + ratio * 100}, 100%, 55%)`; 
     }
 
-    // 2. Size mapping
     let size = 0.55;
     const sizeVal = asset.baseMetrics[mappings.size] || 0;
     const sizeRange = ranges[mappings.size] || { min: 0, max: 100 };
     const sizeRatio = (sizeVal - sizeRange.min) / ((sizeRange.max - sizeRange.min) || 1);
-    size = 0.3 + sizeRatio * 0.75; // normalized size
+    size = 0.3 + sizeRatio * 0.75; 
 
-    // 3. Opacity mapping
     let opacity = 0.85;
     const opacVal = asset.baseMetrics[mappings.opacity] || 0;
     const opacRange = ranges[mappings.opacity] || { min: 0, max: 100 };
     const opacRatio = (opacVal - opacRange.min) / ((opacRange.max - opacRange.min) || 1);
-    opacity = 0.4 + opacRatio * 0.6; // normalized opacity
+    opacity = 0.4 + opacRatio * 0.6; 
 
     return { color, size, opacity };
   });
@@ -709,21 +699,23 @@ export default function FinanceUniverseCanvas({
   return (
     <div className="canvas-container">
       <Canvas
-        camera={{ position: [12, 10, 16], fov: 50 }}
+        camera={{ position: [12, 10, 16], fov: sceneSettings.cameraFov }}
         gl={{ antialias: true }}
         onPointerMissed={() => onSelectAsset(null)}
       >
         <color attach="background" args={['#04060f']} />
-        <SceneSetup />
         
-        {/* Environment Lights */}
-        <ambientLight intensity={0.4} />
-        <pointLight position={[20, 20, 20]} intensity={1.2} decay={1} />
-        <pointLight position={[-20, -20, -20]} intensity={0.7} color="#00f2fe" decay={1} />
-        <directionalLight position={[0, 10, 0]} intensity={0.5} />
+        {/* Sync Camera FOV */}
+        <SceneSetup fov={sceneSettings.cameraFov} />
+        
+        {/* Environment Lights dynamically linked to World settings */}
+        <ambientLight intensity={sceneSettings.ambientLight} />
+        <pointLight position={[20, 20, 20]} intensity={sceneSettings.sunIntensity} decay={1} />
+        <pointLight position={[-20, -20, -20]} intensity={0.5} color="#00f2fe" decay={1} />
+        <directionalLight position={[0, 10, 0]} intensity={sceneSettings.sunIntensity * 0.5} />
 
         {/* Ambient star particles */}
-        <Starfield />
+        <Starfield count={sceneSettings.starCount} />
 
         {/* Dynamic 60FPS Simulation Physics Solver Hook */}
         <SimulationSolver
@@ -735,6 +727,7 @@ export default function FinanceUniverseCanvas({
           onUpdatePhysics={onUpdatePhysics}
           activePositions={activePositions}
           setActivePositions={setActivePositions}
+          gravityConstant={sceneSettings.gravityConstant}
         />
 
         {/* Coordinate grids & axes */}
@@ -743,6 +736,7 @@ export default function FinanceUniverseCanvas({
           yName={dimensions.y}
           zName={dimensions.z}
           ranges={ranges}
+          visible={sceneSettings.gridVisible}
         />
 
         {/* Relationship lines connecting strongly correlated assets */}
@@ -778,9 +772,11 @@ export default function FinanceUniverseCanvas({
               isSelected={isSelected}
               onClick={onSelectAsset}
               onHover={onHoverAsset}
-              showVectorLines={showVectorLines}
+              showVectorLines={sceneSettings.vectorsVisible}
               velocityVec={vel}
               forceVec={forc}
+              shadingMode={sceneSettings.shadingMode}
+              materials={materials}
             />
           );
         })}

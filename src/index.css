@@ -1103,3 +1103,345 @@ body, html {
   max-width: 900px;
   margin-top: 20px;
 }
+
+/* Blender Outliner Styles */
+.blender-outliner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(9, 11, 23, 0.85);
+  border-bottom: 1px solid var(--border-color);
+  min-height: 250px;
+  max-height: 450px;
+  overflow: hidden;
+}
+
+.outliner-tree {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tree-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tree-row.leaf {
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.tree-row.selected {
+  background: rgba(0, 242, 254, 0.15) !important;
+  color: var(--primary) !important;
+  border-left: 2px solid var(--primary);
+}
+
+.outliner-interactive {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.outliner-eye-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.outliner-eye-btn:hover {
+  color: var(--text-primary);
+}
+
+.outliner-badge {
+  font-size: 8px;
+  padding: 1px 4px;
+  background: rgba(0, 242, 254, 0.2);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+/* Blender Properties Inspector Styles */
+.blender-inspector {
+  width: 320px;
+  height: 100%;
+  display: flex;
+  background: rgba(9, 11, 23, 0.85);
+  border-left: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.inspector-tabs {
+  width: 44px;
+  border-right: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 12px;
+}
+
+.inspector-tab-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.inspector-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.inspector-tab-btn.active {
+  color: var(--primary);
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+.inspector-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.property-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.property-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.property-value {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--primary);
+}
+
+/* Blender Node Editor Styles */
+.node-editor-container {
+  height: 320px;
+  border-top: 1px solid var(--border-color);
+  background: #070913;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 20;
+}
+
+.node-editor-header {
+  height: 38px;
+  background: #0a0d1d;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.node-canvas {
+  flex: 1;
+  background-color: #05070e;
+  background-image: 
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 0);
+  background-size: 24px 24px, 120px 120px;
+  position: relative;
+  overflow: hidden;
+}
+
+.node-zoom-pane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5000px;
+  height: 5000px;
+}
+
+.node-svg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.node-card {
+  position: absolute;
+  width: 180px;
+  background: rgba(18, 24, 48, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  user-select: none;
+  z-index: 2;
+}
+
+.node-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.node-card.input {
+  border-left: 3px solid var(--primary);
+}
+.node-card.math {
+  border-left: 3px solid var(--accent);
+}
+.node-card.output {
+  border-left: 3px solid var(--success);
+}
+
+.node-title {
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 11px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.node-delete-btn:hover {
+  color: var(--danger);
+}
+
+.node-sockets {
+  display: flex;
+  padding: 8px 0;
+  position: relative;
+}
+
+.socket-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 50%;
+}
+
+.socket-column.left {
+  align-items: flex-start;
+}
+.socket-column.right {
+  align-items: flex-end;
+}
+
+.socket-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  padding: 0 8px;
+  position: relative;
+}
+
+.socket {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #334155;
+  border: 2px solid #0f172a;
+  cursor: crosshair;
+  z-index: 10;
+}
+.socket:hover {
+  background: var(--primary);
+  transform: scale(1.2);
+}
+
+.socket.in {
+  margin-left: -5px;
+}
+.socket.out {
+  margin-right: -5px;
+}
+
+/* Custom Dropdown buttons inside Node Editor */
+.dropdown-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #0f172a;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  min-width: 120px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.dropdown-menu-container:hover .dropdown-menu {
+  display: flex;
+}
+
+.dropdown-menu button {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dropdown-menu button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.btn-small {
+  height: 24px;
+  font-size: 10px;
+  padding: 0 8px;
+}
+
