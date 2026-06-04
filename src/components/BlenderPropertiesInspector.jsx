@@ -3,16 +3,10 @@ import {
   Camera, 
   Globe, 
   Box, 
-  Layers, 
-  Compass, 
-  Flame, 
-  Sliders, 
-  Sun,
-  Shield,
-  Eye,
-  Type
+  Layers,
+  Settings
 } from 'lucide-react';
-import { SECTORS } from '../data/mockData';
+import { METRICS } from '../data/mockData';
 
 export default function BlenderPropertiesInspector({
   selectedAsset,
@@ -20,9 +14,13 @@ export default function BlenderPropertiesInspector({
   onUpdateSceneSettings,
   materials,
   onUpdateMaterials,
-  onUpdateAssetMetrics
+  onUpdateAssetMetrics,
+  dimensions,
+  onUpdateDimensions,
+  mappings,
+  onUpdateMappings
 }) {
-  const [activePropertyTab, setActivePropertyTab] = useState('scene'); // 'scene' | 'world' | 'object' | 'material' | 'physics'
+  const [activePropertyTab, setActivePropertyTab] = useState('scene'); // 'scene' | 'world' | 'object' | 'material'
 
   const propertyTabs = [
     { id: 'scene', icon: <Camera size={14} />, label: 'Scene Properties' },
@@ -33,7 +31,7 @@ export default function BlenderPropertiesInspector({
 
   return (
     <div className="blender-inspector glass-panel">
-      {/* Tab bar (Left vertical strip or top strip) */}
+      {/* Tab bar (Left vertical strip) */}
       <div className="inspector-tabs">
         {propertyTabs.map(t => (
           <button 
@@ -50,10 +48,88 @@ export default function BlenderPropertiesInspector({
       {/* Tab Contents */}
       <div className="inspector-content">
         
-        {/* TAB 1: SCENE SETTINGS */}
+        {/* TAB 1: SCENE SETTINGS & AXES MAPPINGS */}
         {activePropertyTab === 'scene' && (
-          <div className="inspector-section">
-            <span className="sidebar-section-title uppercase">Render Settings</span>
+          <div className="inspector-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <span className="sidebar-section-title uppercase">Scene Mapping Nodes</span>
+
+            {/* Dimensions mappings */}
+            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)' }}>
+              <div className="select-wrapper">
+                <span className="select-label">X Axis Mapping</span>
+                <select 
+                  className="select-field" 
+                  value={dimensions.x}
+                  onChange={(e) => onUpdateDimensions('x', e.target.value)}
+                >
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+
+              <div className="select-wrapper">
+                <span className="select-label">Y Axis Mapping</span>
+                <select 
+                  className="select-field" 
+                  value={dimensions.y}
+                  onChange={(e) => onUpdateDimensions('y', e.target.value)}
+                >
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+
+              <div className="select-wrapper">
+                <span className="select-label">Z Axis Mapping</span>
+                <select 
+                  className="select-field" 
+                  value={dimensions.z}
+                  onChange={(e) => onUpdateDimensions('z', e.target.value)}
+                >
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Aesthetics mappings */}
+            <span className="sidebar-section-title uppercase" style={{ marginTop: '8px' }}>Visual Aesthetics</span>
+            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)' }}>
+              <div className="select-wrapper">
+                <span className="select-label">Color Code Channel</span>
+                <select 
+                  className="select-field" 
+                  value={mappings.color}
+                  onChange={(e) => onUpdateMappings('color', e.target.value)}
+                >
+                  <option value="sector">Industry Sectors</option>
+                  <option value="assetClass">Asset Classes (Stocks vs Crypto)</option>
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name} Gradient</option>)}
+                </select>
+              </div>
+
+              <div className="select-wrapper">
+                <span className="select-label">Mesh Sphere Size</span>
+                <select 
+                  className="select-field" 
+                  value={mappings.size}
+                  onChange={(e) => onUpdateMappings('size', e.target.value)}
+                >
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+
+              <div className="select-wrapper">
+                <span className="select-label">Mesh Opacity</span>
+                <select 
+                  className="select-field" 
+                  value={mappings.opacity}
+                  onChange={(e) => onUpdateMappings('opacity', e.target.value)}
+                >
+                  {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Viewport Settings */}
+            <span className="sidebar-section-title uppercase" style={{ marginTop: '8px' }}>Render Settings</span>
             
             <div className="property-group">
               <span className="property-label">Viewport Shading</span>
@@ -96,7 +172,7 @@ export default function BlenderPropertiesInspector({
 
             <div className="property-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="property-label">Bloom / Glow Strength</span>
+                <span className="property-label">Bloom Glow Strength</span>
                 <span className="property-value">{(sceneSettings.bloomIntensity || 1).toFixed(1)}x</span>
               </div>
               <input 
@@ -111,7 +187,7 @@ export default function BlenderPropertiesInspector({
             </div>
 
             <div className="property-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="property-label">Render Grid Axes</span>
+              <span className="property-label">Floor Grid Plane</span>
               <input 
                 type="checkbox" 
                 checked={sceneSettings.gridVisible}
@@ -120,7 +196,7 @@ export default function BlenderPropertiesInspector({
             </div>
 
             <div className="property-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="property-label">Vector Trails</span>
+              <span className="property-label">Velocity Vector Trails</span>
               <input 
                 type="checkbox" 
                 checked={sceneSettings.vectorsVisible}
