@@ -26,6 +26,9 @@ import AddAssetModal from './components/AddAssetModal';
 import PhysicsFormulaPanel from './components/PhysicsFormulaPanel';
 import DrillDownAnalysisTab from './components/DrillDownAnalysisTab';
 import FinanceUniverseCanvas from './components/FinanceUniverseCanvas';
+import BlenderNodeEditor from './components/BlenderNodeEditor';
+import BlenderOutliner from './components/BlenderOutliner';
+import BlenderPropertiesInspector from './components/BlenderPropertiesInspector';
 
 export default function App() {
   // Current active template or custom configuration state
@@ -63,8 +66,68 @@ export default function App() {
   const [isPlayingPlayback, setIsPlayingPlayback] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1000); // ms per step
 
+  // Blender UI Workspace customization state
+  const [sceneSettings, setSceneSettings] = useState({
+    gridVisible: true,
+    vectorsVisible: true,
+    cameraFov: 50,
+    bloomIntensity: 1.0,
+    ambientLight: 0.4,
+    sunIntensity: 1.0,
+    starCount: 250,
+    shadingMode: 'rendered', // 'wireframe' | 'solid' | 'rendered'
+    gravityConstant: 1.0
+  });
+
+  const [materials, setMaterials] = useState({
+    roughness: 0.2,
+    metalness: 0.8,
+    emissiveIntensity: 0.5,
+    opacity: 1.0
+  });
+
+  const [showNodeEditor, setShowNodeEditor] = useState(true);
+  const [nodeGraphState, setNodeGraphState] = useState({ nodes: [], links: [] });
+
+  const handleUpdateSceneSettings = (key, val) => {
+    setSceneSettings(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleUpdateMaterials = (key, val) => {
+    setMaterials(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleUpdateAssetMetrics = (symbol, metric, value) => {
+    const valFloat = parseFloat(value);
+    if (isNaN(valFloat)) return;
+    setAssets(prev => prev.map(a => {
+      if (a.symbol === symbol) {
+        return {
+          ...a,
+          baseMetrics: {
+            ...a.baseMetrics,
+            [metric]: valFloat
+          }
+        };
+      }
+      return a;
+    }));
+  };
+
+  const handleUpdateDimensions = (axis, value) => {
+    setDimensions(prev => ({ ...prev, [axis]: value }));
+  };
+
+  const handleUpdateMappings = (channel, value) => {
+    setMappings(prev => ({ ...prev, [channel]: value }));
+  };
+
+  const handleCompileFormulas = (newFormulas, newNodes, newLinks) => {
+    setFormulas(newFormulas);
+    setNodeGraphState({ nodes: newNodes, links: newLinks });
+  };
+
   // Visual options
-  const [showVectorLines, setShowVectorLines] = useState(true);
   const [mode, setMode] = useState('visualization'); // 'visualization' | 'simulation'
 
   // Physics statistics (velocities, forces, positions) synced from ThreeJS Canvas
@@ -391,337 +454,250 @@ export default function App() {
       {/* 3. Main Split container */}
       <div className="workspace-container">
         
-        {/* Render Left Sidebar only on Global Tab */}
+        {/* Render Left Blender Outliner Sidebar only on Global Tab */}
         {activeTabId === 'global' ? (
-          <aside className="sidebar">
-            <div className="sidebar-content" style={{ paddingBottom: '30px' }}>
-              
-              {/* Dimensions axes configuration */}
-              <div className="sidebar-section">
-                <span className="sidebar-section-title">Coordinate Dimensions</span>
-                <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className="select-wrapper">
-                    <span className="select-label">X Axis Mapping</span>
-                    <select 
-                      className="select-field" 
-                      value={dimensions.x}
-                      onChange={(e) => setDimensions({ ...dimensions, x: e.target.value })}
-                    >
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="select-wrapper">
-                    <span className="select-label">Y Axis Mapping</span>
-                    <select 
-                      className="select-field" 
-                      value={dimensions.y}
-                      onChange={(e) => setDimensions({ ...dimensions, y: e.target.value })}
-                    >
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="select-wrapper">
-                    <span className="select-label">Z Axis Mapping</span>
-                    <select 
-                      className="select-field" 
-                      value={dimensions.z}
-                      onChange={(e) => setDimensions({ ...dimensions, z: e.target.value })}
-                    >
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-                </div>
+          <aside className="sidebar" style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '0', background: 'rgba(9, 11, 23, 0.85)' }}>
+            <BlenderOutliner
+              assets={assets}
+              checkedAssets={checkedAssets}
+              onToggleVisibility={(sym) => setCheckedAssets(prev => ({ ...prev, [sym]: !prev[sym] }))}
+              selectedAssetSymbol={selectedAssetSymbol}
+              onSelectAsset={setSelectedAssetSymbol}
+              sceneSettings={sceneSettings}
+              onUpdateSceneSettings={handleUpdateSceneSettings}
+            />
+            {/* Add scene entity button */}
+            <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.2)' }}>
+              <button className="btn btn-primary" style={{ width: '100%', gap: '6px' }} onClick={() => setIsAddModalOpen(true)}>
+                <PlusCircle size={14} /> Add Scene Entity
+              </button>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                * Click entity node names in Outliner to select, toggle eye icons to hide/show in 3D viewport.
               </div>
-
-              {/* Visual aesthetics mapping selection */}
-              <div className="sidebar-section">
-                <span className="sidebar-section-title">Visual Node Aesthetics</span>
-                <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className="select-wrapper">
-                    <span className="select-label">Color Coding</span>
-                    <select 
-                      className="select-field" 
-                      value={mappings.color}
-                      onChange={(e) => setMappings({ ...mappings, color: e.target.value })}
-                    >
-                      <option value="sector">Industry Sectors</option>
-                      <option value="assetClass">Asset Classes (Stocks vs Crypto)</option>
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name} Gradient</option>)}
-                    </select>
-                  </div>
-
-                  <div className="select-wrapper">
-                    <span className="select-label">Sphere Size</span>
-                    <select 
-                      className="select-field" 
-                      value={mappings.size}
-                      onChange={(e) => setMappings({ ...mappings, size: e.target.value })}
-                    >
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="select-wrapper">
-                    <span className="select-label">Opacity / Translucency</span>
-                    <select 
-                      className="select-field" 
-                      value={mappings.opacity}
-                      onChange={(e) => setMappings({ ...mappings, opacity: e.target.value })}
-                    >
-                      {METRICS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Objects / Asset list selector */}
-              <div className="sidebar-section">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="sidebar-section-title">Universe Entities</span>
-                  <button className="btn btn-secondary btn-small" onClick={() => setIsAddModalOpen(true)}>
-                    <Plus size={10} /> Add Entity
-                  </button>
-                </div>
-                <div className="glass-panel" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-                  {assets.map((asset) => {
-                    const isChecked = checkedAssets[asset.symbol];
-                    const isSelected = selectedAssetSymbol === asset.symbol;
-                    const flashClass = tickerFlash[asset.symbol] ? `flash-${tickerFlash[asset.symbol]}` : '';
-
-                    return (
-                      <div 
-                        key={asset.symbol} 
-                        className={`asset-item ${isSelected ? 'selected' : ''} ${flashClass}`}
-                        onClick={() => setSelectedAssetSymbol(asset.symbol)}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={!!isChecked} 
-                            onClick={(e) => e.stopPropagation()} 
-                            onChange={() => setCheckedAssets(prev => ({ ...prev, [asset.symbol]: !prev[asset.symbol] }))}
-                          />
-                          <span style={{ fontWeight: 'bold', fontSize: '12px' }}>{asset.symbol}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{asset.name}</span>
-                        </div>
-                        <span className={`asset-badge ${asset.assetClass === 'Stock' ? 'stock' : 'crypto'}`}>
-                          {asset.assetClass}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Formula Panel Editor */}
-              <div className="sidebar-section" style={{ flex: 1 }}>
-                <PhysicsFormulaPanel
-                  formulas={formulas}
-                  onUpdateFormula={handleUpdateFormula}
-                  onResetDefaultPhysics={handleResetDefaultPhysics}
-                />
-              </div>
-
             </div>
           </aside>
         ) : null}
 
-        {/* 4. Canvas or Drill-Down layout */}
-        <div style={{ flex: 1, height: '100%', position: 'relative', display: 'flex' }}>
+        {/* Center Panel: Viewport + Node Editor */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           
-          {activeTabId === 'global' ? (
-            /* Global Canvas 3D Space */
-            <div style={{ flex: 1, height: '100%', position: 'relative' }}>
-              
-              {/* Floating Top controls */}
-              <div className="hud-card hud-top-center glass-panel" style={{ padding: '8px 12px', alignItems: 'center' }}>
+          <div style={{ flex: 1, height: '100%', position: 'relative', display: 'flex' }}>
+            {activeTabId === 'global' ? (
+              /* Global Canvas 3D Space */
+              <div style={{ flex: 1, height: '100%', position: 'relative' }}>
                 
-                {/* Operating Mode switcher */}
-                <div className="mode-toggle">
+                {/* Floating Top controls */}
+                <div className="hud-card hud-top-center glass-panel" style={{ padding: '8px 12px', alignItems: 'center' }}>
+                  
+                  {/* Operating Mode switcher */}
+                  <div className="mode-toggle">
+                    <button 
+                      className={`mode-btn ${mode === 'visualization' ? 'active' : ''}`}
+                      onClick={() => setMode('visualization')}
+                    >
+                      <Eye size={12} />
+                      Visualization Mode
+                    </button>
+                    <button 
+                      className={`mode-btn simulation ${mode === 'simulation' ? 'active' : ''}`}
+                      onClick={() => setMode('simulation')}
+                    >
+                      <Activity size={12} />
+                      Simulation Mode
+                    </button>
+                  </div>
+
+                  <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 8px' }} />
+
+                  {/* Toggle Node Editor button (Blender style!) */}
                   <button 
-                    className={`mode-btn ${mode === 'visualization' ? 'active' : ''}`}
-                    onClick={() => setMode('visualization')}
+                    className="btn btn-secondary btn-small"
+                    onClick={() => setShowNodeEditor(!showNodeEditor)}
+                    style={{ gap: '4px', border: showNodeEditor ? '1px solid var(--accent)' : '1px solid var(--border-color)' }}
                   >
-                    <Eye size={12} />
-                    Visualization Mode
-                  </button>
-                  <button 
-                    className={`mode-btn simulation ${mode === 'simulation' ? 'active' : ''}`}
-                    onClick={() => setMode('simulation')}
-                  >
-                    <Activity size={12} />
-                    Simulation Mode
+                    Shader Node Editor: {showNodeEditor ? 'ON' : 'OFF'}
                   </button>
                 </div>
 
-                <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 8px' }} />
-
-                {/* Vectors Toggle */}
-                <button 
-                  className="btn btn-secondary btn-small"
-                  onClick={() => setShowVectorLines(!showVectorLines)}
-                  style={{ gap: '4px', border: showVectorLines ? '1px solid var(--primary)' : '1px solid var(--border-color)' }}
-                  title="Draw velocity & force vectors"
-                >
-                  <TrendingUp size={12} className={showVectorLines ? 'text-primary' : ''} />
-                  Vectors: {showVectorLines ? 'ON' : 'OFF'}
-                </button>
-              </div>
-
-              {/* Hover Tooltip Overlay (Left overlay) */}
-              {hoveredAsset && (
-                <div className="hud-card glass-panel-elevated" style={{ top: '20px', left: '20px', padding: '14px', maxWidth: '280px', pointerEvents: 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className={`asset-badge ${hoveredAsset.assetClass === 'Stock' ? 'stock' : 'crypto'}`}>{hoveredAsset.assetClass}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{hoveredAsset.symbol}</span>
-                  </div>
-                  <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '15px', fontWeight: 700, marginTop: '4px' }}>{hoveredAsset.name}</h4>
-                  
-                  <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '8px', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>X ({dimensions.x}):</span>
-                      <span>{hoveredAsset.baseMetrics[dimensions.x]}</span>
+                {/* Hover Tooltip Overlay */}
+                {hoveredAsset && (
+                  <div className="hud-card glass-panel-elevated" style={{ top: '20px', left: '20px', padding: '14px', maxWidth: '280px', pointerEvents: 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className={`asset-badge ${hoveredAsset.assetClass === 'Stock' ? 'stock' : 'crypto'}`}>{hoveredAsset.assetClass}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{hoveredAsset.symbol}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Y ({dimensions.y}):</span>
-                      <span>{hoveredAsset.baseMetrics[dimensions.y]}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Z ({dimensions.z}):</span>
-                      <span>{hoveredAsset.baseMetrics[dimensions.z]}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3D R3F Canvas Render */}
-              <FinanceUniverseCanvas
-                assets={activeAssets}
-                dimensions={dimensions}
-                mappings={mappings}
-                mode={mode}
-                selectedAsset={selectedAssetSymbol}
-                onSelectAsset={setSelectedAssetSymbol}
-                onHoverAsset={setHoveredAsset}
-                formulas={formulas}
-                ranges={ranges}
-                activePositions={activePositions}
-                setActivePositions={setActivePositions}
-                onUpdatePhysics={(v, f) => {
-                  setVelocities(v);
-                  setForces(f);
-                }}
-                velocities={velocities}
-                forces={forces}
-                showVectorLines={showVectorLines}
-              />
-
-              {/* Bottom Playback HUD Panel */}
-              <div className="hud-card hud-bottom-center glass-panel-elevated" style={{ pointerEvents: 'auto' }}>
-                <div className="simulation-panel">
-                  
-                  <div className="timeline-row">
-                    {/* Live vs History toggler */}
-                    <div className="mode-toggle" style={{ marginRight: '8px' }}>
-                      <button 
-                        className={`mode-btn ${!isLiveMode ? 'active' : ''}`}
-                        onClick={() => {
-                          setIsLiveMode(false);
-                          setIsPlayingPlayback(false);
-                        }}
-                      >
-                        <Database size={11} />
-                        History
-                      </button>
-                      <button 
-                        className={`mode-btn simulation ${isLiveMode ? 'active' : ''}`}
-                        onClick={() => {
-                          setIsLiveMode(true);
-                          setIsPlayingPlayback(false);
-                        }}
-                      >
-                        <RefreshCw size={11} />
-                        Real-time
-                      </button>
-                    </div>
-
-                    {!isLiveMode ? (
-                      /* History Timeline Controls */
-                      <React.Fragment>
-                        <button 
-                          className="btn btn-secondary btn-icon-only btn-small"
-                          onClick={() => setIsPlayingPlayback(!isPlayingPlayback)}
-                          title={isPlayingPlayback ? 'Pause historical playback' : 'Play historical playback'}
-                        >
-                          {isPlayingPlayback ? <Pause size={12} /> : <Play size={12} />}
-                        </button>
-
-                        <div className="timeline-slider-container">
-                          <input 
-                            type="range"
-                            className="timeline-slider"
-                            min="0"
-                            max={TIMELINE_LABELS.length - 1}
-                            value={timelineIndex}
-                            onChange={(e) => {
-                              setTimelineIndex(parseInt(e.target.value));
-                              setIsPlayingPlayback(false); // stop playing on manual drag
-                            }}
-                          />
-                          <div className="timeline-tooltip">
-                            Active Step: {TIMELINE_LABELS[timelineIndex]} (2020 - 2024 Timeline)
-                          </div>
-                        </div>
-
-                        {/* Speed select */}
-                        <select 
-                          className="select-field" 
-                          style={{ height: '30px', padding: '0 8px', fontSize: '11px', width: '70px' }}
-                          value={playbackSpeed}
-                          onChange={(e) => setPlaybackSpeed(parseInt(e.target.value))}
-                        >
-                          <option value="1500">0.5x</option>
-                          <option value="1000">1.0x</option>
-                          <option value="400">2.0x</option>
-                          <option value="200">5.0x</option>
-                        </select>
-                      </React.Fragment>
-                    ) : (
-                      /* Live mode ticker explanation */
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        <span className="live-indicator" />
-                        <span>Live simulated asset feed is active. Values fluctuate slightly on a 2s interval to demonstrate continuous updates.</span>
+                    <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '15px', fontWeight: 700, marginTop: '4px' }}>{hoveredAsset.name}</h4>
+                    
+                    <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '8px', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>X ({dimensions.x}):</span>
+                        <span>{hoveredAsset.baseMetrics[dimensions.x]}</span>
                       </div>
-                    )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Y ({dimensions.y}):</span>
+                        <span>{hoveredAsset.baseMetrics[dimensions.y]}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Z ({dimensions.z}):</span>
+                        <span>{hoveredAsset.baseMetrics[dimensions.z]}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3D R3F Canvas Render */}
+                <FinanceUniverseCanvas
+                  assets={activeAssets}
+                  dimensions={dimensions}
+                  mappings={mappings}
+                  mode={mode}
+                  selectedAsset={selectedAssetSymbol}
+                  onSelectAsset={setSelectedAssetSymbol}
+                  onHoverAsset={setHoveredAsset}
+                  formulas={formulas}
+                  ranges={ranges}
+                  activePositions={activePositions}
+                  setActivePositions={setActivePositions}
+                  onUpdatePhysics={(v, f) => {
+                    setVelocities(v);
+                    setForces(f);
+                  }}
+                  velocities={velocities}
+                  forces={forces}
+                  sceneSettings={sceneSettings}
+                  materials={materials}
+                />
+
+                {/* Bottom Playback HUD Panel */}
+                <div className="hud-card hud-bottom-center glass-panel-elevated" style={{ pointerEvents: 'auto' }}>
+                  <div className="simulation-panel">
+                    
+                    <div className="timeline-row">
+                      {/* Live vs History toggler */}
+                      <div className="mode-toggle" style={{ marginRight: '8px' }}>
+                        <button 
+                          className={`mode-btn ${!isLiveMode ? 'active' : ''}`}
+                          onClick={() => {
+                            setIsLiveMode(false);
+                            setIsPlayingPlayback(false);
+                          }}
+                        >
+                          <Database size={11} />
+                          History
+                        </button>
+                        <button 
+                          className={`mode-btn simulation ${isLiveMode ? 'active' : ''}`}
+                          onClick={() => {
+                            setIsLiveMode(true);
+                            setIsPlayingPlayback(false);
+                          }}
+                        >
+                          <RefreshCw size={11} />
+                          Real-time
+                        </button>
+                      </div>
+
+                      {!isLiveMode ? (
+                        /* History Timeline Controls */
+                        <React.Fragment>
+                          <button 
+                            className="btn btn-secondary btn-icon-only btn-small"
+                            onClick={() => setIsPlayingPlayback(!isPlayingPlayback)}
+                            title={isPlayingPlayback ? 'Pause historical playback' : 'Play historical playback'}
+                          >
+                            {isPlayingPlayback ? <Pause size={12} /> : <Play size={12} />}
+                          </button>
+
+                          <div className="timeline-slider-container">
+                            <input 
+                              type="range"
+                              className="timeline-slider"
+                              min="0"
+                              max={TIMELINE_LABELS.length - 1}
+                              value={timelineIndex}
+                              onChange={(e) => {
+                                setTimelineIndex(parseInt(e.target.value));
+                                setIsPlayingPlayback(false); // stop playing on manual drag
+                              }}
+                            />
+                            <div className="timeline-tooltip">
+                              Active Step: {TIMELINE_LABELS[timelineIndex]} (2020 - 2024 Timeline)
+                            </div>
+                          </div>
+
+                          {/* Speed select */}
+                          <select 
+                            className="select-field" 
+                            style={{ height: '30px', padding: '0 8px', fontSize: '11px', width: '70px' }}
+                            value={playbackSpeed}
+                            onChange={(e) => setPlaybackSpeed(parseInt(e.target.value))}
+                          >
+                            <option value="1500">0.5x</option>
+                            <option value="1000">1.0x</option>
+                            <option value="400">2.0x</option>
+                            <option value="200">5.0x</option>
+                          </select>
+                        </React.Fragment>
+                      ) : (
+                        /* Live mode ticker explanation */
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          <span className="live-indicator" />
+                          <span>Live simulated asset feed is active. Values fluctuate slightly on a 2s interval to demonstrate continuous updates.</span>
+                        </div>
+                      )}
+
+                    </div>
 
                   </div>
-
                 </div>
+
               </div>
+            ) : (
+              /* Local Asset Drill Down Tab screen */
+              <DrillDownAnalysisTab 
+                asset={activeTab.asset} 
+                fullAssetList={assets} 
+                onCloseTab={() => handleCloseTab(activeTab.id)}
+              />
+            )}
 
-            </div>
-          ) : (
-            /* Local Asset Drill Down Tab screen */
-            <DrillDownAnalysisTab 
-              asset={activeTab.asset} 
-              fullAssetList={assets} 
-              onCloseTab={() => handleCloseTab(activeTab.id)}
-            />
-          )}
+            {/* Right Selected Asset Details Dock */}
+            {activeTabId === 'global' && selectedAssetSymbol && (
+              <RightDetailDock
+                asset={selectedAsset}
+                formulas={formulas}
+                onClose={() => setSelectedAssetSymbol(null)}
+                onDrillDown={handleDrillDown}
+              />
+            )}
+          </div>
 
-          {/* Right Selected Asset Details Dock */}
-          {activeTabId === 'global' && selectedAssetSymbol && (
-            <RightDetailDock
-              asset={selectedAsset}
-              formulas={formulas}
-              onClose={() => setSelectedAssetSymbol(null)}
-              onDrillDown={handleDrillDown}
+          {/* Bottom Split Blender Node Editor */}
+          {activeTabId === 'global' && showNodeEditor && (
+            <BlenderNodeEditor 
+              onCompileFormulas={handleCompileFormulas}
+              initialNodes={nodeGraphState.nodes}
+              initialLinks={nodeGraphState.links}
             />
           )}
 
         </div>
+
+        {/* Right Blender Properties Inspector only on Global Tab */}
+        {activeTabId === 'global' && (
+          <BlenderPropertiesInspector
+            selectedAsset={selectedAsset}
+            sceneSettings={sceneSettings}
+            onUpdateSceneSettings={handleUpdateSceneSettings}
+            materials={materials}
+            onUpdateMaterials={handleUpdateMaterials}
+            onUpdateAssetMetrics={handleUpdateAssetMetrics}
+            dimensions={dimensions}
+            onUpdateDimensions={handleUpdateDimensions}
+            mappings={mappings}
+            onUpdateMappings={handleUpdateMappings}
+          />
+        )}
 
       </div>
 

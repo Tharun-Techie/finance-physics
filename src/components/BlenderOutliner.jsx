@@ -7,7 +7,7 @@ import {
   EyeOff, 
   ChevronDown, 
   ChevronRight, 
-  Sphere,
+  Globe,
   Grid
 } from 'lucide-react';
 
@@ -122,7 +122,7 @@ export default function BlenderOutliner({
               <div className="tree-node">
                 <div className="tree-row" onClick={() => toggleExpand('assets')}>
                   {expandedNodes.assets ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  <Sphere size={12} style={{ color: 'var(--primary)' }} />
+                  <Globe size={12} style={{ color: 'var(--primary)' }} />
                   <span>Asset Collection (Meshes)</span>
                 </div>
                 
@@ -138,7 +138,7 @@ export default function BlenderOutliner({
                           className={`tree-row leaf outliner-interactive ${isSelected ? 'selected' : ''}`}
                           onClick={() => onSelectAsset(asset.symbol)}
                         >
-                          <Sphere size={11} style={{ opacity: 0.8, color: asset.assetClass === 'Stock' ? 'var(--primary)' : 'var(--accent)' }} />
+                          <Globe size={11} style={{ opacity: 0.8, color: asset.assetClass === 'Stock' ? 'var(--primary)' : 'var(--accent)' }} />
                           <span style={{ fontWeight: isSelected ? 'bold' : 'normal' }}>
                             {asset.symbol} ({asset.name})
                           </span>
